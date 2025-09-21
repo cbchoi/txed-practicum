@@ -208,3 +208,4 @@ __marimo__/
 
 *.csv
 students/*20*
+*.pid
