@@ -10,7 +10,7 @@ from pathlib import Path
 
 def read_roster(roster_path):
     """
-    roster.csv 파일을 읽어서 학생 정보를 반환
+    roster.csv 파일을 읽어서 학생 정보를 반환 (git_id가 있는 학생만)
 
     Args:
         roster_path (str): roster.csv 파일 경로
@@ -19,15 +19,31 @@ def read_roster(roster_path):
         list: 학생 정보 리스트 [{'id': 'S20211001', 'git_id': 'cbchoi'}, ...]
     """
     students = []
+    skipped_students = []
 
     try:
         with open(roster_path, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 if 'id' in row and 'git_id' in row:
+                    student_id = row['id'].strip()
+                    git_id = row['git_id'].strip()
+
+                    # git_id가 비어있거나 없으면 스킵
+                    if not git_id or git_id == '':
+                        skipped_students.append(student_id)
+                        print(f"Skipping {student_id}: No git_id provided")
+                        continue
+
+                    # git_id에 물음표가 있으면 스킵 (확정되지 않은 계정)
+                    if '?' in git_id:
+                        skipped_students.append(student_id)
+                        print(f"Skipping {student_id}: Unconfirmed git_id '{git_id}'")
+                        continue
+
                     students.append({
-                        'id': row['id'].strip(),
-                        'git_id': row['git_id'].strip()
+                        'id': student_id,
+                        'git_id': git_id
                     })
                 else:
                     print(f"Warning: Invalid row format in roster.csv: {row}")
@@ -37,6 +53,9 @@ def read_roster(roster_path):
     except Exception as e:
         print(f"Error reading roster file: {e}")
         sys.exit(1)
+
+    if skipped_students:
+        print(f"Skipped {len(skipped_students)} students without git_id: {', '.join(skipped_students)}")
 
     return students
 
