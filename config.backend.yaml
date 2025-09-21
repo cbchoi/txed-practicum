@@ -1,0 +1,83 @@
+# 학생 실습 모니터링 시스템 백엔드 구성 파일
+
+# Git 관련 설정
+git:
+  auth_method: none      # Git personal access token 사용 안 함 (공개 저장소만)
+  timeout: 30            # Git 작업 타임아웃 (초)
+  max_retries: 3         # Git 실패 시 최대 재시도 횟수
+
+# 채점 관련 설정
+grading:
+  timeout: 30            # 채점 타임아웃 (초)
+  max_concurrent: 5      # 동시 실행 가능한 최대 채점 수
+  max_memory_mb: 512     # 최대 메모리 사용량 (MB)
+  max_cpu_time: 30       # 최대 CPU 시간 (초)
+
+# 스케줄러 설정
+scheduler:
+  pull_interval: 60      # Git pull 주기 (초)
+  grade_interval: 60     # 채점 주기 (초)
+  enable_auto_cleanup: true  # 자동 정리 기능 활성화
+
+# 서버 설정
+server:
+  host: 0.0.0.0         # 서버 호스트
+  port: 8000            # 서버 포트
+  reload: false         # 개발 모드 (자동 재시작)
+  workers: 1            # 워커 프로세스 수
+
+# 로깅 설정
+logging:
+  level: INFO           # 로그 레벨 (DEBUG, INFO, WARNING, ERROR)
+  file_rotation: true   # 로그 파일 순환
+  max_log_files: 7      # 최대 로그 파일 수
+  max_file_size_mb: 10  # 로그 파일 최대 크기 (MB)
+
+# 보안 설정
+security:
+  enable_resource_limits: true    # 리소스 제한 활성화
+  sandbox_mode: true             # 샌드박스 모드 활성화
+  allowed_file_extensions:       # 허용된 파일 확장자
+    - .py
+    - .txt
+    - .md
+    - .json
+    - .yaml
+    - .yml
+
+# 모니터링 설정
+monitoring:
+  enable_metrics: true           # 메트릭 수집 활성화
+  health_check_interval: 30      # 헬스 체크 간격 (초)
+  max_failed_attempts: 3         # 최대 실패 허용 횟수
+
+# 주차별 실습 설정
+weeks:
+  current_week: 1                # 현재 주차 (기본값)
+  available_weeks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]  # 사용 가능한 주차 목록
+
+# 디렉터리 구조 설정
+directories:
+  problem_folder: "problem"      # 학생 문제 폴더
+  grading_folder: "grading"      # 채점 스크립트 폴더
+  week_pattern: "week{week:02d}"     # 주차 폴더 패턴 (week01, week02, ...)
+
+# 결과 파일 설정
+results:
+  pass_file: "results.pass"      # 통과 결과 파일명
+  fail_file: "results.fail"      # 실패 결과 파일명
+
+# 지원 언어별 실행 설정
+languages:
+  java:
+    compile_command: "find . -name '*.java' -exec javac {} +"
+    run_command: "java Main"
+    source_extensions: [".java"]
+  python:
+    compile_command: null        # Python은 컴파일 불필요
+    run_command: "python3 main.py"
+    source_extensions: [".py"]
+  cpp:
+    compile_command: "g++ -o main *.cpp"
+    run_command: "./main"
+    source_extensions: [".cpp", ".cc"]
