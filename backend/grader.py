@@ -5,14 +5,22 @@
 """
 
 import subprocess
-import resource
 import os
 import signal
 import logging
 import time
 import yaml
+import platform
 from pathlib import Path
 from typing import Literal, Optional, Dict, Any
+
+# Windows/Unix 호환성을 위한 resource 모듈 처리
+try:
+    import resource
+    HAS_RESOURCE = True
+except ImportError:
+    # Windows에서는 resource 모듈이 없음
+    HAS_RESOURCE = False
 
 # 결과 타입 정의
 GradeResult = Literal['pass', 'fail', 'unknown']
@@ -73,7 +81,12 @@ class Grader:
         """
         자식 프로세스의 리소스 제한 설정
         subprocess의 preexec_fn으로 사용됩니다.
+        Windows에서는 resource 모듈이 없으므로 제한 기능을 건너뜁니다.
         """
+        if not HAS_RESOURCE:
+            # Windows에서는 리소스 제한 불가
+            return
+
         try:
             # CPU 시간 제한 (초)
             resource.setrlimit(resource.RLIMIT_CPU, (self.timeout, self.timeout))
@@ -197,15 +210,19 @@ class Grader:
     def _compile_code(self, problem_dir: Path, compile_command: str) -> bool:
         """코드 컴파일"""
         try:
-            result = subprocess.run(
-                compile_command,
-                shell=True,
-                cwd=problem_dir,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                preexec_fn=self.limit_resources
-            )
+            # Windows 호환성: preexec_fn은 Unix에서만 사용 가능
+            kwargs = {
+                'shell': True,
+                'cwd': problem_dir,
+                'capture_output': True,
+                'text': True,
+                'timeout': self.timeout
+            }
+
+            if platform.system() != 'Windows' and HAS_RESOURCE:
+                kwargs['preexec_fn'] = self.limit_resources
+
+            result = subprocess.run(compile_command, **kwargs)
 
             if result.returncode == 0:
                 self.logger.debug(f"Compilation successful: {compile_command}")
@@ -229,26 +246,39 @@ class Grader:
 
             if grading_script.exists():
                 # 채점 스크립트가 있는 경우 실행
+                # Windows/Unix 호환 Python 명령어
+                python_cmd = 'python' if platform.system() == 'Windows' else 'python3'
+
+                kwargs = {
+                    'cwd': grading_dir,
+                    'capture_output': True,
+                    'text': True,
+                    'timeout': self.timeout
+                }
+
+                if platform.system() != 'Windows' and HAS_RESOURCE:
+                    kwargs['preexec_fn'] = self.limit_resources
+
                 result = subprocess.run([
-                    'python3', str(grading_script), str(problem_dir)
-                ],
-                cwd=grading_dir,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                preexec_fn=self.limit_resources
-                )
+                    python_cmd, 'grade.py', str(problem_dir)
+                ], **kwargs)
             elif run_command:
-                # 기본 실행 명령어 사용
-                result = subprocess.run(
-                    run_command,
-                    shell=True,
-                    cwd=problem_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    preexec_fn=self.limit_resources
-                )
+                # 기본 실행 명령어 사용 - Windows 호환 python 명령어로 변경
+                if 'python3' in run_command and platform.system() == 'Windows':
+                    run_command = run_command.replace('python3', 'python')
+
+                kwargs = {
+                    'shell': True,
+                    'cwd': problem_dir,
+                    'capture_output': True,
+                    'text': True,
+                    'timeout': self.timeout
+                }
+
+                if platform.system() != 'Windows' and HAS_RESOURCE:
+                    kwargs['preexec_fn'] = self.limit_resources
+
+                result = subprocess.run(run_command, **kwargs)
             else:
                 return False, "No grading script or run command found"
 
@@ -290,7 +320,7 @@ class Grader:
 
 Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}"""
 
-        result_file.write_text(detailed_message)
+        result_file.write_text(detailed_message, encoding='utf-8')
 
     def _create_fail_result(self, grading_dir: Path, message: str):
         """실패 결과 파일 생성"""
@@ -379,7 +409,7 @@ repository/
 
 Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}"""
 
-        result_file.write_text(detailed_message)
+        result_file.write_text(detailed_message, encoding='utf-8')
 
     def _determine_result(self, grading_dir: Path, student_id: str, week: int = 1) -> GradeResult:
         """

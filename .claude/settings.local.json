@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(python:*)",
+      "Bash(javac:*)",
+      "Bash(find:*)",
+      "Bash(while read dir)",
+      "Bash(do echo \"Compiling $dir\")",
+      "Bash(done)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

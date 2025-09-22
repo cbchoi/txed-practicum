@@ -8,18 +8,31 @@ echo "========================================"
 echo "학생 실습 모니터링 시스템"
 echo "========================================"
 
-# Python 버전 확인
+# Python 버전 확인 (크로스 플랫폼)
+PYTHON_CMD="python3"
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3이 설치되지 않았습니다."
-    exit 1
+    if command -v python &> /dev/null; then
+        PYTHON_CMD="python"
+        echo "✓ Python 확인됨: $(python --version)"
+    else
+        echo "❌ Python이 설치되지 않았습니다."
+        exit 1
+    fi
+else
+    echo "✓ Python 3 확인됨: $(python3 --version)"
 fi
 
-echo "✓ Python 3 확인됨: $(python3 --version)"
-
-# 가상 환경 설정 (선택적)
-if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
-    echo "🔧 가상 환경을 활성화합니다..."
-    source venv/bin/activate
+# 가상 환경 설정 (선택적, 크로스 플랫폼)
+if [ -d "venv" ]; then
+    if [ -f "venv/bin/activate" ]; then
+        # Unix/Linux/macOS
+        echo "🔧 가상 환경을 활성화합니다..."
+        source venv/bin/activate
+    elif [ -f "venv/Scripts/activate" ]; then
+        # Windows (Git Bash)
+        echo "🔧 가상 환경을 활성화합니다..."
+        source venv/Scripts/activate
+    fi
     # 의존성 설치
     echo "📚 의존성을 설치합니다..."
     pip install -q -r requirements.txt
@@ -48,13 +61,13 @@ if [ ! -f "process_list.csv" ]; then
         exit 1
     fi
 
-    python3 generate_process_list.py --roster roster.csv --template "$TEMPLATE" --output process_list.csv
+    $PYTHON_CMD generate_process_list.py --roster roster.csv --template "$TEMPLATE" --output process_list.csv
 fi
 
 # 부트스트랩 실행 여부 확인
 if [ ! -d "students" ] || [ -z "$(ls -A students 2>/dev/null)" ]; then
     echo "🏗️  학생 디렉터리를 초기화합니다..."
-    python3 bootstrap.py
+    $PYTHON_CMD bootstrap.py
 else
     echo "✓ 학생 디렉터리가 이미 존재합니다."
 fi
@@ -91,7 +104,7 @@ trap cleanup SIGINT SIGTERM
 
 # 백엔드 스케줄러 시작
 echo "⚙️  백엔드 스케줄러를 시작합니다..."
-python3 -m backend.scheduler > logs/scheduler.log 2>&1 &
+$PYTHON_CMD -m backend.scheduler > logs/scheduler.log 2>&1 &
 SCHEDULER_PID=$!
 echo $SCHEDULER_PID > scheduler.pid
 echo "   스케줄러 시작됨 (PID: $SCHEDULER_PID)"
@@ -112,10 +125,10 @@ echo "🌐 프론트엔드 서버를 시작합니다..."
 # 설정에서 포트 읽기
 PORT=8000
 if [ -f "config.backend.yaml" ]; then
-    PORT=$(python3 -c "import yaml; print(yaml.safe_load(open('config.backend.yaml'))['server']['port'])" 2>/dev/null || echo "8000")
+    PORT=$($PYTHON_CMD -c "import yaml; print(yaml.safe_load(open('config.backend.yaml'))['server']['port'])" 2>/dev/null || echo "8000")
 fi
 
-python3 frontend/main.py > logs/frontend.log 2>&1 &
+$PYTHON_CMD frontend/main.py > logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo $FRONTEND_PID > frontend.pid
 echo "   프론트엔드 시작됨 (PID: $FRONTEND_PID, Port: $PORT)"
