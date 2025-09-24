@@ -14,17 +14,27 @@
 
 ### 1. 프로젝트 구조
 ```
-student-monitor/
-├── roster.csv              # 학생 ID 및 Git ID 정보 (id,git_id 형태)
-├── process_list.csv        # 유틸리티로 생성된 처리 목록 (id, repository_url)
+txed-practicum/
+├── class_info/           # 채점용 스크립트 폴더
+│   ├── process_list.csv        # 유틸리티로 생성된 처리 목록 (id, repository_url)
+│   └── roster.csv              # 학생 ID 및 Git ID 정보 (id,git_id 형태)
 ├── grading/                # 채점용 스크립트 폴더
+│   ├── week01/             # 학생별 폴더
+│   │   ├── grade.py        # 과제를 채점하기 위한 스크립트
+│   │   └── ...
 │   └── driver_template.py  # 채점 스크립트 템플릿
-├── bootstrap.py            # 초기 설정 스크립트
-├── generate_process_list.py # roster.csv와 템플릿에서 process_list.csv 생성
+├── logs/
+│   ├── bootstrap.log      # bootstrap 과정에서의 로그
+│   ├── backend.log        # backend 실행과정에서의 로그
+│   └── frontend.log       # frontend 실행과정에서의 로그
+├── bootstrap/
+│   ├── bootstrap.py        # 초기 설정 스크립트
+│   └── generate_process_list.py # roster.csv와 템플릿에서 process_list.csv 생성
 ├── backend/
 │   ├── __init__.py
 │   ├── git_manager.py     # Git 작업
 │   ├── grader.py          # 채점 로직
+│   ├── config.backend.yaml     # 백엔드 구성 파일 (pull_interval 등)
 │   └── scheduler.py       # 작업 스케줄링
 ├── frontend/
 │   ├── main.py            # FastAPI 애플리케이션
@@ -32,21 +42,20 @@ student-monitor/
 │       └── dashboard.html  # Material Design 대시보드
 ├── students/               # 학생 개별 폴더들
 │   ├── S20211001/         # 학생별 폴더
-│   │   ├── repo/          # 클론된 저장소
-│   │   └── grading/       # 복사된 채점 폴더
+│   │   ├── week01/        # github에서 클론된 저장소
+│   │   └── ...   
 │   └── ...
-├── config.backend.yaml     # 백엔드 구성 파일 (pull_interval 등)
 └── requirements.txt        # Python 의존성
 ```
 
 ### 2. 유틸리티 프로그램 (generate_process_list.py)
 
 #### 2.1 기능 명세
-1. **roster.csv 읽기**: `id,git_id` 형태의 CSV 파일
+1. **class_info/roster.csv 읽기**: `id,git_id` 형태의 CSV 파일
 2. **템플릿 처리**: GitHub 저장소 템플릿에서 {git_id} 부분을 실제 git_id로 치환
    - 예: `https://github.com/HBNU-COME2201/software-design-practicum-{git_id}`
    - 결과: `https://github.com/HBNU-COME2201/software-design-practicum-cbchoi`
-3. **process_list.csv 생성**: `id,repository_url` 형태로 출력
+3. **class_info/process_list.csv 생성**: `id,repository_url` 형태로 출력
    - 예: `S20211001,https://github.com/HBNU-COME2201/software-design-practicum-cbchoi`
 
 #### 2.2 사용법
@@ -57,13 +66,14 @@ python generate_process_list.py --roster roster.csv --template "https://github.c
 ### 3. 부트스트랩 구현 (bootstrap.py)
 
 #### 2.1 기능 명세
-1. **process_list.csv 읽기**: `id`, `repository_url` 컬럼 포함
+1. **class_info/process_list.csv 읽기**: `id`, `repository_url` 컬럼 포함
 2. **각 학생별 처리**:
    - `students/{id}/` 디렉터리 생성 (없는 경우만)
-   - GitHub 저장소를 `students/{id}/repo/`에 클론
-   - `grading/` 폴더 전체를 `students/{id}/grading/`로 복사
-   - Git personal access token은 사용하지 않음 (공개 저장소만)
-3. **오류 처리**:
+   - GitHub 저장소를 `students/{id}/`에 클론
+   - Git personal access token은 사용하지 않음
+3. **클론된 레포지토리에 grading의 파일복사**: 학생의 과제를 채점하기 위해 필요한 파일 복사
+   - 예: `grading/week01/grade01.py`파일을 `students/S20211001/software-design-practicum-cbchoi/grade01.py`로 복사
+4. **오류 처리**:
    - 이미 존재하는 디렉터리 건너뛰기
    - 클론 실패 작업 로깅
    - 오류 발생 시 다음 학생으로 계속 진행
@@ -71,7 +81,6 @@ python generate_process_list.py --roster roster.csv --template "https://github.c
 #### 2.2 기술 요구사항
 - subprocess를 사용한 git 작업
 - 적절한 로깅 구현
-- 프라이빗 저장소 인증 처리 (환경 변수로 토큰 관리)
 
 ### 3. Git 관리자 (backend/git_manager.py)
 
@@ -79,21 +88,19 @@ python generate_process_list.py --roster roster.csv --template "https://github.c
 - **기능**:
   - 모든 학생 저장소에서 git pull 수행
   - 각 저장소별 상태 반환 (성공/실패)
-  - SSH 키 또는 토큰을 통한 git 인증 처리
-  - 실패한 pull에 대한 재시도 로직
   - 세마포어 제한을 둔 asyncio를 사용한 동시 작업
 
 #### 3.2 기술 명세
 - **동시성**: asyncio 기반 비동기 처리
 - **제한**: 동시 작업 수 제한 (기본값: 5)
-- **타임아웃**: git 작업 타임아웃 (기본값: 30초)
+- **타임아웃**: git 작업 타임아웃 (기본값: 5초)
 - **재시도**: 네트워크 오류 시 최대 3회 재시도
 
 ### 4. 채점 관리자 (backend/grader.py)
 
 #### 4.1 Grader 클래스 명세
 - **기능**:
-  - 각 학생 디렉터리의 `grading/` 폴더에서 채점 스크립트 실행
+  - 각 학생의 저장소 내 `grade.py` 채점 스크립트 실행
   - 실행 결과에 따라 `pass` 파일 또는 `fail` 파일 생성
   - 각 채점 작업에 30초 타임아웃 구현
   - 디버깅을 위한 stderr/stdout 캡처 및 로깅
@@ -105,7 +112,6 @@ python generate_process_list.py --roster roster.csv --template "https://github.c
 
 #### 4.2 기술 명세
 - **샌드박싱**: 제한된 권한으로 학생 코드 실행
-- **리소스 제한**: CPU (1코어), 메모리 (512MB), 디스크 (100MB)
 - **네트워크 격리**: 채점 중 네트워크 액세스 비활성화
 - **타임아웃**: 각 채점 작업 30초 제한
 
@@ -118,7 +124,7 @@ python generate_process_list.py --roster roster.csv --template "https://github.c
   - 각 학생의 마지막 알려진 상태 유지
   - FastAPI 통합을 위한 비동기 인터페이스 제공
   - 우아한 종료 구현
-  - 모든 학생 정보를 수집하여 frontend에 제공
+  - 모든 학생 정보를 수집하여 frontend에 주기적으로 제공
 
 #### 5.2 기술 명세
 - **스케줄링**: APScheduler 또는 asyncio 기반
@@ -135,6 +141,7 @@ git:
 grading:
   timeout: 30
   max_concurrent: 5
+  num_of_problems: 3     # 과제 총 과제 갯수
 
 scheduler:
   pull_interval: 60     # Git pull 주기 (초)
@@ -169,6 +176,7 @@ server:
 #### 2.1 기능 명세
 - **표시 내용**:
   - 학생 ID 및 합격/불합격 상태
+  - 학생 ID에 따른 패스 여부 확인, num_of_problem의 설정값을 바탕으로 개별 과제의 pass 여부 확인
   - 마지막 업데이트 타임스탬프
   - 색상 코딩: 녹색(합격), 빨간색(불합격), 회색(알 수 없음)
 - **기능**:
@@ -185,6 +193,8 @@ server:
   - 초록색 배경: 실습 통과 학생
   - 기본 배경: 실습 미통과 학생
 - **페이지네이션**: 한 화면에 들어가지 않으면 주기적으로 페이지 전환
+- **네비게이션**: 이전/다음 페이지 전환을 위한 기능 
+- **데이터 갱신**: 현재 학생상황을 즉시 확인할 수 있는 기능
 
 #### 2.3 기술 명세
 - **반응형**: CSS Grid 또는 Flexbox 사용

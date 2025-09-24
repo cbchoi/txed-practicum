@@ -1,0 +1,16 @@
+scheduler:
+  pull_interval: 30  # seconds
+  max_concurrent_pulls: 5
+  grading_timeout: 30  # seconds
+
+git:
+  clone_timeout: 30
+  pull_timeout: 30
+
+grading:
+  max_memory_mb: 512
+  max_cpu_seconds: 30
+
+logging:
+  level: INFO
+  format: '%(asctime)s - %(levelname)s - %(message)s'

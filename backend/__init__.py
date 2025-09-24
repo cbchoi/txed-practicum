@@ -1,1 +1,1 @@
-# Backend module for student monitoring system
+# Backend package for student monitoring system
